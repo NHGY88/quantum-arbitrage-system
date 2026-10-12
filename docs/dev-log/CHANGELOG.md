@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-10-11 收尾（版本控制）
+
+- **[新增]** 初始化 Git 仓库，首个提交 `feat: 量子套利系统 + AI 工作站首版`
+  （64 个文件 / 9241 行）。
+- **[新增]** 根级 `.gitignore`：分层排除密钥（`admin.env`、`tg/config.json`）、
+  运行时数据（`*/data/`、`logs/`）、依赖（`node_modules/`）、
+  大二进制（`mcp/`、`pgsql/`、`redis/`、`playwright-browsers/`、`downloads/`、`*.exe`）。
+- **[新增]** 配置模板：`server/admin.env.example`、`tg/config.json.example`，
+  使仓库可复现而不携带任何密钥。
+- **[新增]** 根级 `README.md`：功能总览、架构图、快速开始、权限与积分规则、文档索引。
+- **[安全]** 提交前扫描发现并清除 9 处硬编码密码：
+  测试脚本与文档中写死了管理员口令与数据库口令。
+  改为 `process.env.ADMIN_PW` 或占位符 `<ADMIN_PASSWORD>` / `<DB_PASSWORD>`，
+  复检确认暂存区零敏感串。
+- **[配置]** `points.py` 常量改为从 `admin.env` 读取
+  （`POINTS_SIGNUP_BONUS` / `POINTS_VALID_DAYS` / `POINTS_COMMISSION_RATE` / `POINTS_DECAY_HOUR`），
+  规则调整不再需要改代码。
+
+---
+
 ## 2026-10-11 收尾（Web 功能补全）
 
 - **[修复] 推广返佣算错人（重要）**：闭包表缺少父节点自环行 `(parent,parent,0)`，
