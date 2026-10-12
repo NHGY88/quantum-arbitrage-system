@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0f14" />
+<title>权限控制台 · 量子套利</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#111823;--panel2:#0f1620;--line:#1e2a38;--fg:#dbe6f2;--muted:#7d8ea3;--accent:#2ee6a8;--warn:#ffb020;--danger:#ff5c5c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  header{display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:10}
+  header .grow{flex:1}
+  a{color:var(--accent);text-decoration:none}
+  main{flex:1;max-width:1200px;width:100%;margin:0 auto;padding:16px}
+  h1{font-size:18px;margin:0 0 4px}
+  h2{font-size:13px;letter-spacing:1px;color:var(--muted);margin:0 0 10px;text-transform:uppercase}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 18px;line-height:1.7}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  input,select{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);font-size:14px}
+  label{font-size:12px;color:var(--muted);display:block;margin:8px 0 4px}
+  button{padding:9px 16px;border-radius:8px;border:0;background:var(--accent);color:#04231a;font-weight:700;cursor:pointer;font-size:14px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+  button.sm{padding:5px 10px;font-size:12px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+  .badge.admin{color:var(--accent);border-color:rgba(46,230,168,.4)}
+  .badge.off{color:var(--danger);border-color:rgba(255,92,92,.35)}
+  .badge.on{color:var(--accent);border-color:rgba(46,230,168,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .permgroup{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel2)}
+  .permgroup h3{margin:0 0 8px;font-size:13px;color:var(--fg);display:flex;align-items:center;gap:6px}
+  .perm{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;cursor:pointer}
+  .perm input{width:auto;margin:0;accent-color:var(--accent)}
+  .perm .pkey{font-size:10px;color:var(--muted);margin-left:auto}
+  .drawer{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:30}
+  .drawer.open{display:block}
+  .drawer .panel{position:absolute;right:0;top:0;bottom:0;width:min(560px,100%);background:var(--panel);
+    border-left:1px solid var(--line);padding:16px;overflow:auto}
+  .drawer header{position:static;padding:0 0 12px;border:0;background:transparent}
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+  #toast.show{opacity:1}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+  .hint{font-size:12px;color:var(--muted)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 终端</a>
+  <div class="grow"></div>
+  <span class="badge" id="who">未登录</span>
+  <button class="ghost sm" id="logout">登出</button>
+</header>
+
+<main>
+  <h1>权限控制台</h1>
+  <p class="sub">用户可在 <a href="/register.html">注册页</a> 自助注册，注册后为「待授权」状态。你在这里为每个人按五大类权限
+    （组合 / 交易 / 我的 / 公告 / 后台任务）逐项授权。管理员账号本身拥有全部权限，不受此处修改影响。</p>
+
+  <div class="card">
+    <h2>新建用户</h2>
+    <div class="row2">
+      <div><label>用户名</label><input id="nu" placeholder="例如 trader01"></div>
+      <div><label>显示名</label><input id="nd" placeholder="例如 交易员一号"></div>
+    </div>
+    <div class="row2">
+      <div><label>初始口令</label><input id="np" placeholder="至少 4 位"></div>
+      <div><label>角色预设</label>
+        <select id="nr">
+          <option value="user">普通用户（无预设）</option>
+          <option value="viewer">只读 viewer</option>
+          <option value="trader">交易员 trader</option>
+          <option value="operator">运维 operator</option>
+        </select>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:12px">
+      <button id="btnCreate">创建用户</button>
+      <span class="hint">创建后可在下方点“授权”逐项勾选权限</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>用户与权限</h2>
+    <table>
+      <thead><tr><th>用户</th><th>角色</th><th>已授权数量</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="5" style="color:var(--muted)">加载中…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>授权码（Phase 7）</h2>
+    <div class="toolbar">
+      <input id="llabel" placeholder="备注，例如 张三-月度" style="max-width:220px">
+      <input id="ldays" type="number" value="365" placeholder="有效天数" style="max-width:120px">
+      <input id="lmach" type="number" value="1" placeholder="设备数" style="max-width:110px">
+      <button id="btnLic">生成授权码</button>
+      <button class="ghost sm" id="btnRefreshLic">刷新</button>
+    </div>
+    <div id="licOut" class="hint"></div>
+    <table style="margin-top:12px">
+      <thead><tr><th>授权码</th><th>备注</th><th>计划</th><th>设备</th><th>到期</th><th>状态</th><th></th></tr></thead>
+      <tbody id="licRows"><tr><td colspan="7" style="color:var(--muted)">加载中…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="drawer" id="drawer">
+  <div class="panel">
+    <header>
+      <strong id="dTitle">授权</strong>
+      <div class="grow"></div>
+      <button class="ghost sm" id="dClose">关闭</button>
+    </header>
+    <p class="hint" id="dHint">勾选后点击保存；取消勾选即表示移除该权限。</p>
+    <div id="dBody" class="grid"></div>
+    <div class="toolbar" style="margin-top:16px">
+      <button id="dSave">保存授权</button>
+      <button class="ghost sm" id="dPresetViewer">套用只读</button>
+      <button class="ghost sm" id="dPresetTrader">套用交易员</button>
+      <button class="ghost sm" id="dPresetOperator">套用运维</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API="/api";
+let token=localStorage.getItem("qe_token")||"";
+let catalog=null, users=[], editing=null;
+const $=(s)=>document.querySelector(s);
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function H(){return token?{Authorization:"Bearer "+token}:{};}
+
+async function boot(){
+  if(!token){toast("请先在终端登录");return;}
+  try{const me=await (await fetch(API+"/auth/me",{headers:H()})).json();
+    $("#who").textContent=me.username+" / "+me.role;
+    if(me.role!=="admin"){toast("仅管理员可访问本页");}
+  }catch(e){toast("登录已失效");}
+  catalog=await (await fetch(API+"/rbac/catalog",{headers:H()})).json();
+  await loadUsers(); await loadLic();
+}
+
+async function loadUsers(){
+  const r=await fetch(API+"/rbac/users",{headers:H()});
+  if(!r.ok){$("#rows").innerHTML='<tr><td colspan="5" style="color:var(--danger)">无权访问（需最高权限管理员）</td></tr>';return;}
+  users=(await r.json()).users||[];
+  $("#rows").innerHTML=users.map(u=>{
+    const isAdmin=u.role==="admin";
+    const n=(u.effective||[]).length;
+    const pending=!isAdmin && n===0;
+    return `<tr>
+      <td><strong>${esc(u.username)}</strong>${u.display_name?`<div style="color:var(--muted);font-size:12px">${esc(u.display_name)}</div>`:""}</td>
+      <td><span class="badge ${isAdmin?"admin":""}">${esc(u.role)}</span>${pending?` <span class="badge" style="color:var(--warn);border-color:rgba(255,176,32,.4)">待授权</span>`:""}</td>
+      <td>${isAdmin?"全部":n}</td>
+      <td><span class="badge ${u.enabled?"on":"off"}">${u.enabled?"启用":"停用"}</span></td>
+      <td>${isAdmin?"—":`<button class="sm" onclick="openPerms('${esc(u.username)}')">授权</button>
+        <button class="ghost sm" onclick="toggleUser('${esc(u.username)}')">${u.enabled?"停用":"启用"}</button>
+        <button class="ghost sm" onclick="delUser('${esc(u.username)}')">删除</button>`}</td>
+    </tr>`;}).join("")||'<tr><td colspan="5" style="color:var(--muted)">暂无用户</td></tr>';
+}
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+function openPerms(username){
+  editing=users.find(u=>u.username===username); if(!editing)return;
+  $("#dTitle").textContent="授权："+editing.username;
+  const eff=new Set(editing.effective||[]);
+  $("#dBody").innerHTML=(catalog.categories||[]).map(cat=>`
+    <div class="permgroup"><h3>${esc(cat.label)}</h3>
+      ${cat.permissions.map(p=>`<label class="perm">
+        <input type="checkbox" data-key="${esc(p.key)}" ${eff.has(p.key)?"checked":""}>
+        <span>${esc(p.label)}</span><span class="pkey">${esc(p.key)}</span></label>`).join("")}
+    </div>`).join("");
+  $("#drawer").classList.add("open");
+}
+
+function collectPerms(){
+  const out={};
+  $("#dBody").querySelectorAll("input[data-key]").forEach(i=>{out[i.dataset.key]=i.checked?"allow":"deny";});
+  return out;
+}
+
+async function savePerms(){
+  if(!editing)return;
+  const r=await fetch(API+"/rbac/users/"+encodeURIComponent(editing.username)+"/permissions",
+    {method:"PUT",headers:{...H(),"Content-Type":"application/json"},body:JSON.stringify({permissions:collectPerms()})});
+  if(r.ok){toast("已保存授权");$("#drawer").classList.remove("open");await loadUsers();}
+  else toast("保存失败："+r.status);
+}
+function preset(keys){
+  if(!editing)return;
+  const set=new Set(keys);
+  $("#dBody").querySelectorAll("input[data-key]").forEach(i=>{i.checked=set.has(i.dataset.key);});
+}
+async function toggleUser(u){
+  const cur=users.find(x=>x.username===u);
+  await fetch(API+"/rbac/users/"+encodeURIComponent(u),{method:"PATCH",headers:{...H(),"Content-Type":"application/json"},
+    body:JSON.stringify({enabled:!cur.enabled})});
+  await loadUsers(); toast("已更新");
+}
+async function delUser(u){
+  if(!confirm("确认删除用户 "+u+" ？"))return;
+  const r=await fetch(API+"/rbac/users/"+encodeURIComponent(u),{method:"DELETE",headers:H()});
+  toast(r.ok?"已删除":"删除失败"); await loadUsers();
+}
+async function createUser(){
+  const body={username:$("#nu").value.trim(),display_name:$("#nd").value.trim(),password:$("#np").value,role:$("#nr").value,permissions:[]};
+  if(!body.username||!body.password){toast("用户名与口令必填");return;}
+  const r=await fetch(API+"/rbac/users",{method:"POST",headers:{...H(),"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json();
+  toast(r.ok?"已创建，去点“授权”分配权限":("创建失败："+(j.detail||r.status)));
+  if(r.ok){$("#nu").value=$("#np").value="";await loadUsers();}
+}
+
+// --- licenses ---
+async function loadLic(){
+  const r=await fetch(API+"/licenses",{headers:H()});
+  const tbody=$("#licRows");
+  if(!r.ok){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted)">需管理员权限</td></tr>';return;}
+  const list=(await r.json()).licenses||[];
+  tbody.innerHTML=list.map(l=>`<tr>
+    <td><code>${esc(l.key_prefix||"—")}</code></td>
+    <td>${esc(l.label||"—")}</td><td>${esc(l.plan)}</td><td>${l.max_machines}</td>
+    <td style="font-size:12px">${l.expires_at?esc(l.expires_at.slice(0,10)):"永久"}</td>
+    <td><span class="badge ${l.status==="active"?"on":"off"}">${esc(l.status)}</span></td>
+    <td><button class="ghost sm" onclick="revokeLic('${esc(l.id)}')">吊销</button></td>
+  </tr>`).join("")||'<tr><td colspan="7" style="color:var(--muted)">暂无授权码</td></tr>';
+}
+async function createLic(){
+  const body={label:$("#llabel").value.trim(),days:+$("#ldays").value||365,max_machines:+$("#lmach").value||1,plan:"pro"};
+  const r=await fetch(API+"/licenses",{method:"POST",headers:{...H(),"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(r.ok){$("#licOut").innerHTML=`新授权码（只显示这一次）：<code style="color:var(--accent)">${esc(j.key)}</code>`;toast("已生成，请复制保存");}
+  else toast("生成失败");
+  await loadLic();
+}
+async function revokeLic(id){ if(!confirm("吊销该授权码？"))return;
+  await fetch(API+"/licenses/"+id,{method:"DELETE",headers:H()}); toast("已吊销"); await loadLic(); }
+
+$("#btnCreate").onclick=createUser;
+$("#dSave").onclick=savePerms;
+$("#dClose").onclick=()=>$("#drawer").classList.remove("open");
+$("#btnLic").onclick=createLic;
+$("#btnRefreshLic").onclick=loadLic;
+$("#dPresetViewer").onclick=()=>preset(catalog.roles.find(r=>r.key==="viewer").permissions);
+$("#dPresetTrader").onclick=()=>preset(catalog.roles.find(r=>r.key==="trader").permissions);
+$("#dPresetOperator").onclick=()=>preset(catalog.roles.find(r=>r.key==="operator").permissions);
+$("#logout").onclick=()=>{localStorage.removeItem("qe_token");location.href="/";};
+boot();
+// auto-refresh the user list so self-registered accounts show up on their own
+setInterval(()=>{ if(token && !$("#drawer").classList.contains("open")) loadUsers(); }, 20000);
+</script>
+</body>
+</html>

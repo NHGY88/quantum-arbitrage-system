@@ -1,0 +1,93 @@
+# ============================================================================
+#  量子套利系统 + AI 工作站 — 版本控制忽略规则
+#  原则：只提交「源码 + 文档 + 配置模板」，绝不提交密钥、数据库和二进制。
+# ============================================================================
+
+# ---- 密钥与本地配置（最高优先级，绝不入库） ----
+# Admin Server 的 JWT 密钥 / 数据库口令 / 管理员口令都在这里
+server/admin.env
+admin.env
+*.env
+.env
+.env.*
+!.env.example
+# Telegram bot token
+tg/config.json
+# opencode 本地配置与插件状态
+.opencode/
+opencode/
+.local/
+
+# ---- 数据库与运行时数据 ----
+server/data/
+server/data/**
+server/*.db.json
+*.db.json
+*.db.json.tmp
+# PostgreSQL / Redis 数据与二进制
+pgsql/
+redis/
+
+# ---- 依赖 ----
+node_modules/
+**/node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+package-lock.json
+**/package-lock.json
+
+# ---- 二进制与大文件 ----
+# MCP 依赖 (131MB)、Chromium (720MB)、安装包 (128MB)、便携数据库
+mcp/
+playwright-browsers/
+downloads/
+OpenGenerativeAI/
+*.exe
+*.zip
+*.dll
+*.bin
+*.db
+*.dump
+*.png
+*.jpg
+*.jpeg
+*.svg
+# cloudflared 本体（用启动脚本自动下载即可）
+cloudflared*
+
+# ---- 日志与运行时数据 ----
+*.log
+tunnel.log
+logs/
+**/logs/
+*.pid
+tmp/
+*.tmp
+*.bak
+*~
+# 运行时数据（含用户消息内容，绝不入库）
+tg/data/
+tunnel/data/
+third-hand/data/
+# PowerShell 脚本在本机被执行策略拦截，且已提供 .cmd 包装
+*.ps1
+
+# ---- 运行时数据目录 ----
+web/data/
+shots/
+**/shots/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 明确要保留的 ----
+!server/combos/*.md
+!server/requirements.txt
+!docs/**

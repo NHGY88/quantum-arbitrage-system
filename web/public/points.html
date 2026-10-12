@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0f14" />
+<title>我的积分与团队 · 量子套利</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#111823;--panel2:#0f1620;--line:#1e2a38;--fg:#dbe6f2;--muted:#7d8ea3;--accent:#2ee6a8;--warn:#ffb020;--danger:#ff5c5c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  header{display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);
+    background:var(--panel);position:sticky;top:0;z-index:10}
+  header .grow{flex:1}
+  a{color:var(--accent);text-decoration:none}
+  main{flex:1;max-width:1000px;width:100%;margin:0 auto;padding:16px}
+  h1{font-size:19px;margin:0 0 4px}
+  h2{font-size:13px;letter-spacing:1px;color:var(--muted);margin:0 0 10px;text-transform:uppercase}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px;line-height:1.7}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .stat .k{font-size:11px;color:var(--muted);letter-spacing:.5px}
+  .stat .v{font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;margin-top:6px}
+  .stat .v.small{font-size:16px}
+  .stat.warn .v{color:var(--warn)}
+  .refbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  input{flex:1;min-width:200px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--fg);font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  button{padding:9px 16px;border-radius:9px;border:0;background:var(--accent);color:#04231a;
+    font-weight:700;cursor:pointer;font-size:13px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+  .pos{color:var(--accent)}.neg{color:var(--danger)}
+  .depth{font-size:11px;color:var(--muted)}
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;
+    transition:opacity .2s;z-index:60}
+  #toast.show{opacity:1}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7}
+  code{background:var(--panel2);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 终端</a>
+  <div class="grow"></div>
+  <span class="badge" id="who">—</span>
+  <button class="ghost" id="logout">登出</button>
+</header>
+
+<main>
+  <h1>我的积分与团队</h1>
+  <p class="sub">注册即赠 100 积分，有效期 30 天，每天 02:00 自动扣减至到期归零。
+    你的下级每获得积分，你按 10% 逐级获得积分。</p>
+
+  <div class="grid">
+    <div class="stat"><div class="k">当前积分</div><div class="v" id="pts">—</div></div>
+    <div class="stat"><div class="k">剩余天数</div><div class="v small" id="days">—</div></div>
+    <div class="stat"><div class="k">直属下级</div><div class="v small" id="direct">—</div></div>
+    <div class="stat"><div class="k">团队总人数</div><div class="v small" id="total">—</div></div>
+    <div class="stat"><div class="k">团队积分合计</div><div class="v small" id="teamp">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>我的推广链接</h2>
+    <div class="refbox">
+      <input id="reflink" readonly>
+      <button id="copy">复制链接</button>
+    </div>
+    <p class="hint" style="margin:10px 0 0">
+      我的推广码：<code id="refcode">—</code>　上级：<code id="referrer">无</code>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>团队成员</h2>
+    <div id="teamWrap"><p class="hint">加载中…</p></div>
+  </div>
+
+  <div class="card">
+    <h2>积分流水</h2>
+    <div id="ledgerWrap"><p class="hint">加载中…</p></div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const API="/api";
+const $=s=>document.querySelector(s);
+let token=localStorage.getItem("qe_token")||"";
+function H(){return token?{Authorization:"Bearer "+token}:{};}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+async function load(){
+  if(!token){toast("请先登录");return;}
+  try{
+    const me=await (await fetch(API+"/auth/me",{headers:H()})).json();
+    $("#who").textContent=me.username+" / "+me.role;
+  }catch(e){toast("登录已失效");return;}
+
+  try{
+    const r=await fetch(API+"/points/me",{headers:H()});
+    if(!r.ok){toast("无权限或加载失败");return;}
+    const s=await r.json();
+
+    $("#pts").textContent=Number(s.points).toFixed(2);
+    $("#days").textContent = s.expires_at ? (s.days_left + " 天") : "—";
+    $("#direct").textContent=s.team_direct;
+    $("#total").textContent=s.team_total;
+    $("#teamp").textContent=Number(s.team_points).toFixed(2);
+    $("#refcode").textContent=s.ref_code||"—";
+    $("#referrer").textContent=s.referrer||"无";
+
+    const link=location.origin+"/?ref="+(s.ref_code||"");
+    $("#reflink").value=link;
+
+    // team table
+    const team=s.team||[];
+    $("#teamWrap").innerHTML = team.length ? `
+      <table><thead><tr><th>层级</th><th>用户</th><th>积分</th><th>状态</th></tr></thead><tbody>
+      ${team.map(m=>`<tr>
+        <td class="depth">第 ${m.depth} 级</td>
+        <td><strong>${esc(m.display_name||m.username)}</strong>
+            <div class="depth">${esc(m.username)}</div></td>
+        <td>${Number(m.points).toFixed(2)}</td>
+        <td><span class="badge ${m.enabled?"":"off"}">${m.enabled?"正常":"停用"}</span></td>
+      </tr>`).join("")}</tbody></table>`
+      : '<p class="hint">还没有下级。把上面的推广链接发给朋友，他注册后就会出现在这里。</p>';
+  }catch(e){toast("加载失败");}
+
+  try{
+    const r=await fetch(API+"/points/ledger",{headers:H()});
+    if(r.ok){
+      const l=(await r.json()).ledger||[];
+      $("#ledgerWrap").innerHTML = l.length ? `
+        <table><thead><tr><th>时间</th><th>变动</th><th>余额</th><th>说明</th></tr></thead><tbody>
+        ${l.map(e=>`<tr>
+          <td class="depth">${esc((e.created_at||"").slice(0,19).replace("T"," "))}</td>
+          <td class="${Number(e.delta)>=0?"pos":"neg"}">${Number(e.delta)>=0?"+":""}${e.delta}</td>
+          <td>${e.balance}</td>
+          <td class="depth">${esc(e.reason)}${e.source_user?" ← "+esc(e.source_user):""}</td>
+        </tr>`).join("")}</tbody></table>`
+        : '<p class="hint">暂无流水记录。</p>';
+    }
+  }catch(e){}
+}
+
+$("#copy").onclick=async()=>{
+  const v=$("#reflink").value;
+  try{ await navigator.clipboard.writeText(v); toast("推广链接已复制"); }
+  catch(e){ $("#reflink").select(); document.execCommand("copy"); toast("已复制"); }
+};
+$("#logout").onclick=()=>{localStorage.removeItem("qe_token");location.href="/";};
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

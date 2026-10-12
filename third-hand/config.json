@@ -1,0 +1,18 @@
+{
+  "hotkey": "ctrl+alt+space",
+  "tray": true,
+  "user_name": "3号小叶",
+  "capture": {
+    "enabled": true,
+    "mode": "active_window",
+    "max_files": 200
+  },
+  "opencode": {
+    "session_id": "auto",
+    "worktree": "D:\\AI",
+    "auto_dispatch": true,
+    "poll_interval_ms": 1500,
+    "reply_timeout_ms": 300000
+  },
+  "log_level": "INFO"
+}

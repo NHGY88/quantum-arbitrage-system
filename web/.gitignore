@@ -1,0 +1,9 @@
+# deps
+node_modules/
+
+# logs
+*.log
+
+# local env
+.env
+.env.local

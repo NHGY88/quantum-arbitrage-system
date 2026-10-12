@@ -1,0 +1,13 @@
+{
+  "_comment": "这是模板文件。复制为 config.json 后填入真实值；config.json 已被 .gitignore 排除。",
+  "bot_token": "在此填入 Telegram Bot Token（@BotFather 获取）",
+  "owner_name": "你的名字",
+  "owner_chat_id": 0,
+  "opencode": {
+    "session_id": "auto",
+    "worktree": "D:\\AI",
+    "auto_dispatch": true,
+    "poll_interval_ms": 1500,
+    "reply_timeout_ms": 180000
+  }
+}

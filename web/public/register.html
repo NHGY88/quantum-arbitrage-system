@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0f14" />
+<title>注册 · 量子套利</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#111823;--panel2:#0f1620;--line:#1e2a38;--fg:#dbe6f2;--muted:#7d8ea3;--accent:#2ee6a8;--warn:#ffb020;--danger:#ff5c5c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:20px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .card{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px}
+  h1{font-size:19px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 20px;line-height:1.7}
+  label{font-size:12px;color:var(--muted);display:block;margin:12px 0 4px}
+  input{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--fg);font-size:15px}
+  input:focus{outline:none;border-color:var(--accent)}
+  button{width:100%;margin-top:18px;padding:12px;border-radius:9px;border:0;background:var(--accent);
+    color:#04231a;font-weight:700;font-size:15px;cursor:pointer}
+  button:disabled{opacity:.6}
+  .msg{margin-top:14px;padding:11px 13px;border-radius:9px;font-size:13px;line-height:1.6;display:none}
+  .msg.ok{background:rgba(46,230,168,.1);border:1px solid rgba(46,230,168,.35);color:var(--accent);display:block}
+  .msg.err{background:rgba(255,92,92,.1);border:1px solid rgba(255,92,92,.35);color:var(--danger);display:block}
+  .msg.wait{background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.35);color:var(--warn);display:block}
+  .foot{margin-top:18px;text-align:center;font-size:13px}
+  a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>注册账号</h1>
+  <p class="sub">自助注册后账号即为「待授权」状态。管理员会在权限控制台为你分配可用的功能权限，授权后即可使用。</p>
+
+  <div id="refBox" class="msg" style="display:none;margin-bottom:14px"></div>
+
+  <label>用户名</label>
+  <input id="u" placeholder="字母 / 数字 / 下划线" autocomplete="username">
+  <label>显示名（可选）</label>
+  <input id="d" placeholder="你的称呼">
+  <label>口令</label>
+  <input id="p" type="password" placeholder="至少 6 位" autocomplete="new-password">
+  <label>确认口令</label>
+  <input id="p2" type="password" placeholder="再输入一次" autocomplete="new-password">
+
+  <button id="go">提交注册</button>
+  <div class="msg" id="msg"></div>
+
+  <div class="foot">已有账号？<a href="/">去登录</a></div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+
+// Capture ?ref=CODE from the referral link and show who recommended you.
+const refCode = new URLSearchParams(location.search).get("ref") || "";
+if (refCode) {
+  fetch("/api/points/ref/" + encodeURIComponent(refCode))
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      if (j && j.valid) {
+        const b = $("#refBox");
+        b.style.display = "block";
+        b.className = "msg ok";
+        b.textContent = "你的推荐人：" + j.referrer;
+      }
+    })
+    .catch(() => {});
+}
+
+$("#go").onclick=async()=>{
+  const u=$("#u").value.trim(), p=$("#p").value, p2=$("#p2").value, d=$("#d").value.trim();
+  const m=$("#msg"); m.className="msg";
+  if(!u||!p){m.className="msg err";m.textContent="用户名和口令必填";return;}
+  if(p.length<6){m.className="msg err";m.textContent="口令至少 6 位";return;}
+  if(p!==p2){m.className="msg err";m.textContent="两次输入的口令不一致";return;}
+  $("#go").disabled=true;
+  try{
+    const r=await fetch("/api/auth/register",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:u,password:p,display_name:d,ref_code:refCode})});
+    const j=await r.json();
+    if(r.ok){
+      m.className="msg wait";
+      m.textContent="注册成功！" +
+        (j.points ? "已获得 " + Number(j.points).toFixed(2) + " 积分（" + (j.points_expires_at||"").slice(0,10) + " 到期）。" : "") +
+        "当前状态：待授权，管理员分配权限后即可使用。";
+    }
+    else{m.className="msg err";m.textContent=j.detail||("注册失败 "+r.status);}
+  }catch(e){m.className="msg err";m.textContent="网络错误，请稍后再试";}
+  $("#go").disabled=false;
+};
+</script>
+</body>
+</html>

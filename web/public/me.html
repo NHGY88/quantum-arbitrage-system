@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0f14" />
+<title>我的 · 量子套利</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#111823;--panel2:#0f1620;--line:#1e2a38;--fg:#dbe6f2;--muted:#7d8ea3;--accent:#2ee6a8;--warn:#ffb020}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  header{display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:10}
+  header .grow{flex:1}
+  a{color:var(--accent);text-decoration:none}
+  main{flex:1;max-width:700px;width:100%;margin:0 auto;padding:16px}
+  h1{font-size:19px;margin:0 0 12px}
+  h2{font-size:13px;letter-spacing:1px;color:var(--muted);margin:0 0 12px;text-transform:uppercase}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .k{color:var(--muted);font-size:13px}
+  .row .v{font-size:14px;font-weight:600;text-align:right;word-break:break-all}
+  label{font-size:12px;color:var(--muted);display:block;margin:10px 0 4px}
+  input{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);font-size:14px}
+  button{padding:9px 16px;border-radius:9px;border:0;background:var(--accent);color:#04231a;font-weight:700;cursor:pointer;font-size:13px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+  .nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+  .nav a{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--fg);font-size:13px;text-decoration:none;display:block}
+  .nav a:hover{border-color:var(--accent)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+  #toast.show{opacity:1}
+  .perm{display:inline-block;margin:3px 4px 3px 0;padding:3px 8px;border-radius:6px;font-size:11px;
+    border:1px solid var(--line);color:var(--muted);font-family:ui-monospace,Menlo,Consolas,monospace}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 终端</a>
+  <div class="grow"></div>
+  <button class="ghost" id="logout">登出</button>
+</header>
+
+<main>
+  <h1>我的</h1>
+
+  <div class="card">
+    <h2>账号信息</h2>
+    <div class="row"><span class="k">用户名</span><span class="v" id="u">—</span></div>
+    <div class="row"><span class="k">显示名</span><span class="v" id="d">—</span></div>
+    <div class="row"><span class="k">角色</span><span class="v"><span class="badge" id="r">—</span></span></div>
+    <div class="row"><span class="k">积分</span><span class="v" id="p">—</span></div>
+    <div class="row"><span class="k">上级</span><span class="v" id="ref">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>修改显示名</h2>
+    <input id="nd" placeholder="新的显示名">
+    <div style="margin-top:12px"><button id="saveName">保存</button></div>
+  </div>
+
+  <div class="card">
+    <h2>我的权限</h2>
+    <div id="perms"><span style="color:var(--muted);font-size:13px">加载中…</span></div>
+  </div>
+
+  <div class="card">
+    <h2>快捷入口</h2>
+    <div class="nav">
+      <a href="/points.html">我的积分与团队</a>
+      <a href="/notice.html">公告</a>
+      <a href="/permissions.html">权限控制台</a>
+      <a href="/accounts.html">账号与授权码</a>
+      <a href="/register.html">注册新账号</a>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const API="/api",$=s=>document.querySelector(s);
+const token=()=>localStorage.getItem("qe_token")||"";
+function H(){const t=token();return t?{Authorization:"Bearer "+t}:{};}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+
+(async()=>{
+  if(!token()){toast("请先登录");return;}
+  const me=await (await fetch(API+"/auth/me",{headers:H()})).json();
+  $("#u").textContent=me.username;
+  $("#d").textContent=me.display_name||"—";
+  $("#r").textContent=me.role;
+  $("#nd").value=me.display_name||"";
+
+  const perms=me.permissions||[];
+  $("#perms").innerHTML = perms.length
+    ? perms.map(p=>`<span class="perm">${p}</span>`).join("")
+    : '<span style="color:var(--warn);font-size:13px">暂无权限，请联系管理员在权限控制台为你授权</span>';
+
+  try{
+    const s=await (await fetch(API+"/points/me",{headers:H()})).json();
+    $("#p").textContent=Number(s.points).toFixed(2);
+    $("#ref").textContent=s.referrer||"无";
+  }catch(e){$("#p").textContent="—";$("#ref").textContent="—";}
+})();
+
+$("#saveName").onclick=async()=>{
+  const dn=$("#nd").value.trim();
+  const r=await fetch(API+"/auth/profile",{method:"PUT",
+    headers:{...H(),"Content-Type":"application/json"},
+    body:JSON.stringify({display_name:dn})});
+  const j=await r.json().catch(()=>({}));
+  if(r.ok){$("#d").textContent=dn;toast("已保存");}
+  else toast(j.detail||"保存失败");
+};
+$("#logout").onclick=()=>{localStorage.removeItem("qe_token");location.href="/";};
+</script>
+</body>
+</html>

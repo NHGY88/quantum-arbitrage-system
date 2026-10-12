@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0f14" />
+<title>量子套利 · Web 终端</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#111823; --panel-2:#0f1620; --line:#1e2a38;
+    --fg:#dbe6f2; --muted:#7d8ea3; --accent:#2ee6a8; --warn:#ffb020; --danger:#ff5c5c;
+    --radius:12px; --gap:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;}
+  body{min-height:100dvh;display:flex;flex-direction:column;}
+
+  header{display:flex;align-items:center;gap:12px;padding:12px 16px;
+    border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:20}
+  .brand{font-weight:700;letter-spacing:.5px}
+  .brand small{color:var(--muted);font-weight:400;margin-left:8px}
+  .spacer{flex:1}
+  .pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .pill.on{color:var(--accent);border-color:rgba(46,230,168,.4)}
+  .pill.off{color:var(--danger);border-color:rgba(255,92,92,.4)}
+
+  main{flex:1;padding:var(--gap);display:grid;gap:var(--gap);
+    grid-template-columns:1fr;max-width:1400px;width:100%;margin:0 auto}
+  @media (min-width:1000px){ main{grid-template-columns:340px 1fr} }
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+  .card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  input,select{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--fg);font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  button{width:100%;margin-top:12px;padding:10px;border-radius:8px;border:0;cursor:pointer;
+    background:var(--accent);color:#04231a;font-weight:700;font-size:14px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+
+  .drawer{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .combo{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;
+    justify-content:space-between;align-items:center;gap:8px}
+  .combo:last-child{border-bottom:0}
+  .combo:hover{background:var(--panel-2)}
+  .combo.active{background:rgba(46,230,168,.08)}
+  .corr{font-variant-numeric:tabular-nums;font-size:12px;color:var(--accent)}
+  .syms{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .result{margin-top:12px;padding:12px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);
+    font-variant-numeric:tabular-nums;font-size:13px;line-height:1.8;white-space:pre-wrap}
+  .k{color:var(--muted)}.v{color:var(--fg);font-weight:600}.v.ok{color:var(--accent)}.v.warn{color:var(--warn)}
+
+  .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:10px}
+  .shot{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;aspect-ratio:4/3;
+    background:var(--panel-2)}
+  .shot img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer}
+  .shot .del{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:6px;border:0;
+    background:rgba(0,0,0,.6);color:var(--danger);cursor:pointer;font-size:14px;line-height:1}
+
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;
+    transition:opacity .2s;z-index:50;max-width:92vw}
+  #toast.show{opacity:1}
+  footer{padding:10px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;
+    display:flex;gap:14px;flex-wrap:wrap}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">量子套利 <small>Web 终端</small></div>
+  <div class="spacer"></div>
+  <span class="pill" id="pillAuth">未登录</span>
+  <span class="pill" id="pillApi">检测中…</span>
+</header>
+
+<main>
+  <!-- 左栏：登录 / 组合 -->
+  <section class="card">
+    <h2>身份</h2>
+    <label for="u">用户名</label>
+    <input id="u" value="admin" autocomplete="username">
+    <label for="p">密码</label>
+    <input id="p" type="password" placeholder="ChangeMe123!" autocomplete="current-password">
+    <button id="btnLogin">登录</button>
+    <button class="ghost" id="btnLogout">登出</button>
+
+    <h2 style="margin-top:18px">高正相关组合</h2>
+    <div class="drawer" id="drawer"><div class="combo"><span class="syms">登录后加载…</span></div></div>
+  </section>
+
+  <!-- 右栏：计算器 + 截图 -->
+  <section>
+    <div class="card">
+      <h2>动态对冲计算器</h2>
+      <label for="mode">模式</label>
+      <select id="mode">
+        <option value="value">价值对冲 (value)</option>
+        <option value="margin">保证金对冲 (margin)</option>
+        <option value="volatility">波动率对冲 (volatility)</option>
+      </select>
+      <div class="row">
+        <div><label for="va">A 腿价值</label><input id="va" type="number" value="100"></div>
+        <div><label for="vb">B 腿价值</label><input id="vb" type="number" value="175"></div>
+      </div>
+      <div class="row">
+        <div><label for="va1">A 波动率</label><input id="va1" type="number" step="0.01" value="1"></div>
+        <div><label for="vb1">B 波动率</label><input id="vb1" type="number" step="0.01" value="1"></div>
+      </div>
+      <div class="row">
+        <div><label for="corr">相关系数</label><input id="corr" type="number" step="0.01" min="0" max="1" value="0.95"></div>
+        <div><label for="equity">账户权益</label><input id="equity" type="number" value="100000"></div>
+      </div>
+      <label for="lots">A 腿手数</label>
+      <input id="lots" type="number" step="0.01" value="0.01">
+      <button id="btnCalc">计算</button>
+      <div class="result" id="result">等待计算…</div>
+    </div>
+
+    <div class="card" style="margin-top:var(--gap)">
+      <h2>截图极值点解析</h2>
+      <label for="file">上传 K 线截图（PNG/JPG）</label>
+      <input id="file" type="file" accept="image/*">
+      <div class="shots" id="shots"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>Admin :8000</span><span>Web :3000</span>
+  <a href="/points.html">我的积分</a>
+  <a href="/accounts.html">账号授权</a>
+  <a href="/permissions.html">权限控制台</a>
+  <a href="/register.html">注册</a>
+  <span id="offline" style="display:none;color:var(--warn)">离线（使用本地缓存）</span>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+const API = "/api";
+let token = localStorage.getItem("qe_token") || "";
+let combosCache = localStorage.getItem("qe_combos") || "[]";
+
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function authHeaders(){return token?{Authorization:"Bearer "+token}:{};}
+
+async function ping(){
+  const pill=document.getElementById("pillApi");
+  try{const r=await fetch("/health");if(!r.ok)throw 0;const j=await r.json();
+    pill.textContent="Admin "+j.status;pill.className="pill on";}
+  catch{pill.textContent="Admin 离线";pill.className="pill off";
+    document.getElementById("offline").style.display="inline";}
+}
+function setAuth(on){const p=document.getElementById("pillAuth");
+  p.textContent=on?"已登录":"未登录";p.className="pill "+(on?"on":"");}
+
+async function login(){
+  const u=document.getElementById("u").value.trim();
+  const p=document.getElementById("p").value;
+  try{
+    const r=await fetch(API+"/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:u,password:p})});
+    if(!r.ok){toast("登录失败："+r.status);return;}
+    const j=await r.json();token=j.access_token;localStorage.setItem("qe_token",token);
+    setAuth(true);toast("登录成功");await loadCombos();await loadShots();
+  }catch(e){toast("网络错误");}
+}
+function logout(){token="";localStorage.removeItem("qe_token");setAuth(false);toast("已登出");}
+
+function renderCombos(list){
+  const d=document.getElementById("drawer");
+  if(!list.length){d.innerHTML='<div class="combo"><span class="syms">暂无组合（服务端 combos/ 目录为空）</span></div>';return;}
+  d.innerHTML=list.map((c,i)=>`<div class="combo" data-i="${i}">
+    <span class="syms">${c.title} · ${c.legs.map(l=>l.symbol).join(" / ")}</span>
+    <span class="corr">${c.correlation!=null?c.correlation.toFixed(2):"—"}</span></div>`).join("");
+  d.querySelectorAll(".combo").forEach(el=>el.onclick=()=>{
+    d.querySelectorAll(".combo").forEach(x=>x.classList.remove("active"));
+    el.classList.add("active");
+    const c=list[+el.dataset.i];
+    if(c.correlation!=null)document.getElementById("corr").value=c.correlation;
+  });
+}
+async function loadCombos(){
+  try{const r=await fetch(API+"/combos",{headers:authHeaders()});
+    if(!r.ok)return;const j=await r.json();
+    localStorage.setItem("qe_combos",JSON.stringify(j.combos||[]));renderCombos(j.combos||[]);}
+  catch{renderCombos(JSON.parse(combosCache));}
+}
+
+async function calc(){
+  const body={mode:document.getElementById("mode").value,
+    value_a:+document.getElementById("va").value,value_b:+document.getElementById("vb").value,
+    vol_a:+document.getElementById("va1").value,vol_b:+document.getElementById("vb1").value,
+    corr:+document.getElementById("corr").value,equity:+document.getElementById("equity").value,
+    lots:+document.getElementById("lots").value};
+  const r=document.getElementById("result");
+  try{
+    const res=await fetch(API+"/hedge/calculate",{method:"POST",
+      headers:{"Content-Type":"application/json",...authHeaders()},body:JSON.stringify(body)});
+    const j=await res.json();
+    if(!res.ok){r.textContent="计算失败："+(j.detail||res.status);return;}
+    r.innerHTML=
+      `<span class="k">请求对冲比</span> <span class="v">${j.requested_ratio}</span>\n`+
+      `<span class="k">风控后比例</span> <span class="v ${j.risk_triggered?"warn":"ok"}">${j.final_ratio}</span>\n`+
+      `<span class="k">建议手数  </span> <span class="v ok">${j.lots}</span>\n`+
+      `<span class="k">仓位价值  </span> <span class="v">${j.implied_value}</span> / 上限 ${j.max_allowed_value}\n`+
+      `<span class="k">1% 风控  </span> <span class="v ${j.risk_triggered?"warn":"ok"}">${j.risk_triggered?"已触发":"未触发"}</span>\n`+
+      `<span class="k">0.01 最小手</span> <span class="v ${j.lot_floored?"warn":"ok"}">${j.lot_floored?"已托底":"无需托底"}</span>`;
+  }catch{r.textContent="网络错误，已离线";}
+}
+
+async function loadShots(){
+  const box=document.getElementById("shots");
+  try{
+    const r=await fetch(API+"/shots",{headers:authHeaders()});
+    if(!r.ok){box.innerHTML="";return;}
+    const j=await r.json();
+    box.innerHTML=(j.shots||[]).map(s=>`<div class="shot">
+      <img src="${API}/shots/${s.id}" alt="${s.filename}" onclick="window.open(this.src)">
+      <button class="del" data-id="${s.id}">×</button></div>`).join("");
+    box.querySelectorAll(".del").forEach(b=>b.onclick=async()=>{
+      await fetch(API+"/shots/"+b.dataset.id,{method:"DELETE",headers:authHeaders()});
+      toast("已删除");await loadShots();});
+  }catch{}
+}
+document.getElementById("file").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  const fd=new FormData();fd.append("file",f);
+  try{const r=await fetch(API+"/shots",{method:"POST",headers:authHeaders(),body:fd});
+    if(r.ok){toast("上传成功");await loadShots();}else toast("上传失败");}
+  catch{toast("离线，无法上传");}
+  e.target.value="";
+};
+
+document.getElementById("btnLogin").onclick=login;
+document.getElementById("btnLogout").onclick=logout;
+document.getElementById("btnCalc").onclick=calc;
+setAuth(!!token);ping();setInterval(ping,15000);
+if(token){loadCombos();loadShots();}else{renderCombos(JSON.parse(combosCache));}
+</script>
+</body>
+</html>

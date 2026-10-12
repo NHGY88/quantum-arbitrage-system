@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0f14" />
+<title>公告 · 量子套利</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#111823;--panel2:#0f1620;--line:#1e2a38;--fg:#dbe6f2;--muted:#7d8ea3;--accent:#2ee6a8;--warn:#ffb020;--danger:#ff5c5c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  header{display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:10}
+  header .grow{flex:1}
+  a{color:var(--accent);text-decoration:none}
+  main{flex:1;max-width:900px;width:100%;margin:0 auto;padding:16px}
+  h1{font-size:19px;margin:0 0 12px}
+  h2{font-size:13px;letter-spacing:1px;color:var(--muted);margin:0 0 10px;text-transform:uppercase}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  input,select,textarea{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--fg);font-size:14px;font-family:inherit}
+  textarea{min-height:110px;resize:vertical;line-height:1.6}
+  label{font-size:12px;color:var(--muted);display:block;margin:10px 0 4px}
+  .row{display:flex;gap:10px;align-items:center}
+  button{padding:9px 16px;border-radius:9px;border:0;background:var(--accent);color:#04231a;font-weight:700;cursor:pointer;font-size:13px}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);font-weight:500}
+  button.sm{padding:5px 10px;font-size:12px}
+  .note{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px;background:var(--panel2)}
+  .note.pinned{border-color:rgba(46,230,168,.45)}
+  .note.warning{border-left:3px solid var(--warn)}
+  .note.critical{border-left:3px solid var(--danger)}
+  .note h3{margin:0 0 6px;font-size:15px;display:flex;gap:8px;align-items:center}
+  .note .meta{font-size:11px;color:var(--muted);margin-bottom:8px}
+  .note .txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--fg)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+  .pin{color:var(--warn)}
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+  #toast.show{opacity:1}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7}
+  #composer{display:none}
+  #composer.open{display:block}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 终端</a>
+  <div class="grow"></div>
+  <span class="badge" id="who">—</span>
+  <button class="ghost" id="logout">登出</button>
+</header>
+
+<main>
+  <h1>公告</h1>
+
+  <div class="card" id="composer">
+    <h2>发布公告</h2>
+    <label>标题</label>
+    <input id="nt" placeholder="公告标题">
+    <label>内容</label>
+    <textarea id="nb" placeholder="公告正文"></textarea>
+    <div class="row" style="margin-top:12px;gap:10px">
+      <select id="nl" style="max-width:140px">
+        <option value="info">普通</option>
+        <option value="warning">警告</option>
+        <option value="critical">紧急</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;margin:0">
+        <input type="checkbox" id="np" style="width:auto"> 置顶
+      </label>
+      <div class="grow" style="flex:1"></div>
+      <button class="ghost sm" id="cancel">取消</button>
+      <button id="publish">发布</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <h2 style="margin:0;flex:1">全部公告</h2>
+      <button id="newBtn" style="display:none">发布公告</button>
+    </div>
+    <div id="list"><p class="hint">加载中…</p></div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const API="/api", $=s=>document.querySelector(s);
+let token=localStorage.getItem("qe_token")||"", perms=[];
+function H(){return token?{Authorization:"Bearer "+token}:{};}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200);}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+const can=p=>perms.includes(p);
+
+async function boot(){
+  if(!token){toast("请先登录");return;}
+  const me=await (await fetch(API+"/auth/me",{headers:H()})).json();
+  perms=me.permissions||[];
+  $("#who").textContent=me.username+" / "+me.role;
+  if(can("notice:write")||can("notice:manage")) $("#newBtn").style.display="";
+  load();
+}
+async function load(){
+  const r=await fetch(API+"/notices",{headers:H()});
+  if(!r.ok){$("#list").innerHTML='<p class="hint">无查看公告权限（notice:read）</p>';return;}
+  const list=(await r.json()).notices||[];
+  $("#list").innerHTML = list.length ? list.map(n=>`
+    <div class="note ${esc(n.level)} ${n.pinned?"pinned":""}">
+      <h3>${n.pinned?'<span class="pin">📌</span>':""}${esc(n.title)}
+        ${n.level!=="info"?`<span class="badge">${n.level==="warning"?"警告":"紧急"}</span>`:""}</h3>
+      <div class="meta">${esc(n.author||"系统")} · ${new Date((n.created_at||0)*1000).toLocaleString("zh-CN")}
+        ${can("notice:manage")?`· <a href="#" data-del="${esc(n.id)}" style="color:var(--danger)">删除</a>`:""}</div>
+      <div class="txt">${esc(n.body)}</div>
+    </div>`).join("")
+    : '<p class="hint">暂无公告。</p>';
+  $("#list").querySelectorAll("[data-del]").forEach(a=>a.onclick=async ev=>{
+    ev.preventDefault();
+    if(!confirm("确认删除该公告？"))return;
+    const rr=await fetch(API+"/notices/"+a.dataset.del,{method:"DELETE",headers:H()});
+    toast(rr.ok?"已删除":"删除失败");load();
+  });
+}
+$("#newBtn").onclick=()=>$("#composer").classList.toggle("open");
+$("#cancel").onclick=()=>$("#composer").classList.remove("open");
+$("#publish").onclick=async()=>{
+  const title=$("#nt").value.trim();
+  if(!title){toast("标题必填");return;}
+  const r=await fetch(API+"/notices",{method:"POST",headers:{...H(),"Content-Type":"application/json"},
+    body:JSON.stringify({title,body:$("#nb").value,level:$("#nl").value,pinned:$("#np").checked})});
+  toast(r.ok?"已发布":"发布失败"); if(r.ok){$("#nt").value=$("#nb").value="";$("#composer").classList.remove("open");load();}
+};
+$("#logout").onclick=()=>{localStorage.removeItem("qe_token");location.href="/";};
+boot();
+setInterval(load,60000);
+</script>
+</body>
+</html>
