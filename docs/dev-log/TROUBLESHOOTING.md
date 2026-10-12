@@ -327,6 +327,66 @@ $env:PYTHONUTF8="1"
 
 ---
 
+## H. Git / GitHub
+
+### H1. ⚠️ `git push` 无限挂死，没有任何输出
+
+**症状**：执行 `git push` 后终端一直不返回，也不打印进度，
+网络明明通（`curl https://github.com` 正常）。
+
+**原因**：**Git Credential Manager 的 GUI 选择器**在非交互会话里弹不出窗口，
+于是永久阻塞。本机 git 的系统配置里带 `credential.helper = helper-selector`，
+指向 `D:\hermes_agent\tools\git\mingw64\bin\git-credential-helper-selector.exe`。
+
+用 `GIT_TRACE=1` 可以看到它卡在这一行：
+```
+trace: run_command: 'git credential-helper-selector store'
+```
+
+**解决**（三处一起做）：
+1. 移除系统级助手：`git config --system --unset-all credential.helper`
+2. 本地置空：`git config --local credential.helper ""`
+3. 设置 `GIT_TERMINAL_PROMPT=0`，杜绝任何终端提示
+
+**日常使用**：直接跑 `D:\AI\push.cmd`（已封装上述逻辑，token 由 gh 注入且用后即还原）。
+
+---
+
+### H2. 推送时不想把 token 写进 remote URL
+
+**说明**：临时把 token 拼进 remote URL 是绕过 GCM 的常用手法，
+但如果忘记还原，token 会留在 `.git/config` 里（本地文件，可能被误提交）。
+
+**解决**：`push.cmd` 会在 push 结束后自动把 remote 还原为干净 URL。
+手动处理：
+```powershell
+git -C D:\AI remote set-url origin https://github.com/<owner>/<repo>.git
+```
+
+---
+
+### H3. 中文提交信息在 API 返回里显示为问号
+
+**症状**：`gh api` / GitHub API 返回的 commit message 是 `????`
+
+**原因**：这是 **PowerShell 控制台编码问题**，不是数据损坏 ——
+仓库里的中文是完好的，用浏览器打开仓库页即可看到正确文字。
+
+**排查时**：`[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)`。
+
+---
+
+### H4. 提交前如何确认没有泄露密钥
+
+```powershell
+git add -A
+git grep --cached -n -I -E "8762810365:|gho_[A-Za-z0-9]+|<你的口令>"
+# 输出为空 = 干净
+```
+本次入库前正是用这条命令查出并清除了 9 处硬编码密码。
+
+---
+
 ## G. 积分与推广
 
 ### G1. ⚠️ 上级绑定了，但积分发给了别人 / 分成没到账
